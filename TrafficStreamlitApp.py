@@ -125,9 +125,10 @@ st.write("""This app predicts the likelyhood that a crash is 'major' or not!
 \nThis DOES NOT predict crashes.  
 If you DO have an accident, it predicts whether or not it is bad.
 """)
+
 col1, col2 = st.columns((3,1))
 #image = Image.open('PASSicon.jpg')
-#col1.image(image, use_column_width=True)
+col1.write("Many thanks to the [Data Professor](https://www.youtube.com/dataprofessor) for teaching me about streamlt!") 
 image2 = Image.open('SQLinsightLogo.png')
 col2.image(image2, use_column_width=True)
 col2.write("[SQLinsight](https://SQLinsight.net)") 
