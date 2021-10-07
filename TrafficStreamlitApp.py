@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Sep 30 17:12:28 2021
-
 @author: steve
+
+This python when run opens up a web-app in your browser.
+It reads in a 'pkl' file...which is a ML model.
+In the web-app, you can modify 4 features to get a prediction.
 """
 #%% Imports...
 import streamlit as st
