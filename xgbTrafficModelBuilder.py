@@ -249,7 +249,7 @@ X_train, X_test, y_train, y_test, pr, categoricalVariablesList,\
 
 print(testsummary)
 
-# print(X_train.describe())
+print(X_train.describe())
 # print(y_train.head())
 X_test.describe()
 
