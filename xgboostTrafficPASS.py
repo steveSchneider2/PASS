@@ -1246,7 +1246,4 @@ plot_tree(xgb1.get_booster().best_iteration, 'LR')
 duration = datetime.now() - start
 print(f'Total duration for {filename} is: {duration}')
 
-end = datetime.now()
-end - start
-print(f'Duration of Permutation took: {end-start}')
 
