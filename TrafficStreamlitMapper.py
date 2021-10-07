@@ -5,7 +5,7 @@ Created on Thu Sep 16 18:16:19 2021
 An example of showing geographic data.
 open terminal, cd to github\streamlit
 streamlit run  streamlitTraffic.py
-
+Shows traffic accidents in a map in the web-app.
 """
 
 import streamlit as st
