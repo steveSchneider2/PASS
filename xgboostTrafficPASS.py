@@ -1226,11 +1226,13 @@ plot_FeatureImportance(max_num_features, 'weight')  #Fig: 15
 
 plot_FeatureImportance(max_num_features, 'gain')  # could also be 'gain'
 plot_sidebyside_feature_importanceVSpermutation()  # Plot 17
-
+# %% Shap charts coming...
 explainer = shap.TreeExplainer(xgb1)
 print('Need 19 minutes to do these shap calculations...')
+startShap = datetime.now()
 shap_values = explainer.shap_values(X)  # 19+ minutes!  @depth = 9
-print('Shap_values calculated:  {} ...'.format(datetime.now().strftime("%m/%d/%Y %H:%M:%S")))
+durationShap = datetime.now() - startShap
+print('Shap_values calculated:  {} ...'.format(durationShap))
 
 shap_v, shap_abs, k2, colorlist = ABS_SHAP(shap_values,X)
 print('ABS_Shap calculated:  {} ...'.format(datetime.now().strftime("%m/%d/%Y %H:%M:%S")))
