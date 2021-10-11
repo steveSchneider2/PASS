@@ -45,7 +45,7 @@ def datapreparation(pr):
 
 #%% Main code
 col1, col2, col3 = st.columns((1,3,1))
-image = Image.open ('passSupportFiles/PASSicon.jpg')
+image = Image.open ('passSupportFiles\PASSicon.jpg')
 col2.image(image, use_column_width=True)
 
 image2 = Image.open('passSupportFiles\SQLinsightLogo.png')
