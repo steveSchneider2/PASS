@@ -59,8 +59,8 @@ xgb1 = pickle.load(open('FloridaTraffic2014xgb.pkl', 'rb'))
 
 url = 'https://github.com/steveSchneider2/data/blob/main/FloridaTraffic/traffic116k_88_76pc.csv?raw=true'
 
-st.title('Car Crash Prediction App  \nStreamlit: {:.6s}  Conda environment: {:12s}'.
-         format(st.__version__,os.environ['CONDA_DEFAULT_ENV']))
+st.title('Car Crash Prediction App  \nStreamlit: {:.6s}  Conda environment: MLFlowProtobuf'.
+         format(st.__version__))
 
 # https://kthaisociety.medium.com/using-shap-to-explain-machine-learning-models-3f8f9c3b1f5e
 # explainer = shap.TreeExplainer(xgb1)
