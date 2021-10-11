@@ -54,7 +54,7 @@ image2 = Image.open('PASSsupportfiles/SQLinsightLogo.png')
 
 st.sidebar.image(image2, use_column_width=True)
 start = datetime.now()
-xgb1 = pickle.load(open('FloridaTraffic2014xgb.pkl', 'rb'))
+xgb1 = pickle.load(open('PASSsupportfiles/FloridaTraffic2014xgb.pkl', 'rb'))
 # xgb1 = pickle.load(open('https://github.com/steveSchneider2/PASS/FloridaTraffic2014xgb.pkl?raw=true', 'rb'))
 
 url = 'https://github.com/steveSchneider2/data/blob/main/FloridaTraffic/traffic116k_88_76pc.csv?raw=true'
