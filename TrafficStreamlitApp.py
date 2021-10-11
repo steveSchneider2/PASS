@@ -12,7 +12,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle, os
-import shap
+#import shap
 from datetime import datetime
 from PIL import Image
 
