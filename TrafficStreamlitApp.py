@@ -45,10 +45,10 @@ def datapreparation(pr):
 
 #%% Main code
 col1, col2, col3 = st.columns((1,3,1))
-image = Image.open('PASSicon.jpg')
+image = Image.open ('passSupportFiles/PASSicon.jpg')
 col2.image(image, use_column_width=True)
 
-image2 = Image.open('SQLinsightLogo.png')
+image2 = Image.open('passSupportFiles\SQLinsightLogo.png')
 #col2.image(image2, use_column_width=True)
 #col2.write("[SQLinsight](https://SQLinsight.net)") 
 
@@ -133,6 +133,6 @@ If you DO have an accident, it predicts whether or not it is bad.
 col1, col2 = st.columns((3,1))
 #image = Image.open('PASSicon.jpg')
 col1.write("Many thanks to the [Data Professor](https://www.youtube.com/dataprofessor) for teaching me about streamlt!") 
-image2 = Image.open('SQLinsightLogo.png')
+image2 = Image.open('passSupportFiles\SQLinsightLogo.png')
 col2.image(image2, use_column_width=True)
 col2.write("[SQLinsight](https://SQLinsight.net)") 
