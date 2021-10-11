@@ -105,7 +105,7 @@ meanX[['vehmph','drvage','vehage','dayhour']] = input_df[['vehmph','drvage','veh
 
 # Print specified input parameters
 st.header('Specified Input parameters')
-st.write(meanX)
+st.write(meanX[['vehmph','drvage','vehage','dayhour']])
 #st.write('---')
 
 # Apply model to make predictions
