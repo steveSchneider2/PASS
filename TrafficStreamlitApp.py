@@ -12,9 +12,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle, os
-#import shap
+import shap
 from datetime import datetime
 from PIL import Image
+import matplotlib.pyplot as plt
 
 pd.set_option('display.max_columns', 250)
 pd.set_option('display.width', 250)
@@ -124,6 +125,16 @@ else:
     st.markdown(f'<p style="text-align:center;background-image: linear-gradient(to right,#ff1af3, #f3e124);color:#1313d8;font-size:24px;border-radius:2%;">{Crash}</p>', unsafe_allow_html=True)
 
 st.write('---')
+#---------------------------------#
+explainerxgb = shap.Explainer(xgb1)
+shap_values = explainerxgb(meanX)  # 19+ minutes!  @depth = 9
+
+fig1 = plt.figure(figsize=(8, 4))
+plt.title('Feature importance based on SHAP values (Bar)')
+shap.plots.waterfall(shap_values[0])
+#st.pyplot(bbox_inches='tight')
+st.pyplot(fig1)
+st.write('---')
 
 st.write("""This app predicts the likelyhood that a crash is 'major' or not!
 \nThis DOES NOT predict crashes.  
@@ -136,3 +147,5 @@ col1.write("Many thanks to the [Data Professor](https://www.youtube.com/dataprof
 image2 = Image.open('PASSsupportfiles/SQLinsightLogo.png')
 col2.image(image2, use_column_width=True)
 col2.write("[SQLinsight](https://SQLinsight.net)") 
+
+
