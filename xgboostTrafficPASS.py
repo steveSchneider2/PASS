@@ -1,15 +1,15 @@
 """
 
-Overall comments.
+    Overall comments.
 
 Created on Thu Sep 17 08:06:27 2020.
 
 Stopped work on Nov 30 2020 after achieving 95% accuracy! :)
 Re-ran on 1 Mar 2021 on Python 3.8
 
-RUNTIME: 13 minutes (10 Sep 2021)
+RUNTIME: 18 minutes (1 Nov 2021)
 INPUT:  SQL SERVER TRAFFIC database; 240,000 records.
-OUPUT:   26 graphs
+OUPUT:   31 graphs
 NEEDS Python 3.7 and up. (for plot_confusion_matrix, at least.)
 
 Notes
@@ -42,12 +42,16 @@ https://machinelearningmastery.com/learning-curves-for-diagnosing-machine-learni
 # pylint: disable=W0603,R0913,R0914
 
 # %% Code setup Imports & starting conditions
-from sklearn.inspection import permutation_importance
+from datetime import datetime
+import json
+# import pyodbc  #  needed if you want to pull from SQL server
+import os
+import sys
+import warnings
 import numpy as np  # linear algebra
 import pandas as pd  # data processing, CSV file I/O (e.g. pd.read_csv)
 import sklearn
 import matplotlib as mpl
-# from sklearn.cross_validation import train_test_split
 from sklearn.model_selection import (train_test_split,  # GridSearchCV,
                                      learning_curve, ShuffleSplit)
 from sklearn.metrics import (plot_confusion_matrix,  # mean_squared_error,
@@ -57,33 +61,22 @@ from sklearn.metrics import (plot_confusion_matrix,  # mean_squared_error,
                              plot_roc_curve,  # average_precision_score,
                              brier_score_loss, f1_score)
 from sklearn.metrics import matthews_corrcoef
+from sklearn.inspection import permutation_importance
 from sklearn.calibration import CalibratedClassifierCV, calibration_curve
-# from sklearn.linear_model import LogisticRegression
 import xgboost as xgb
 from xgboost import XGBClassifier, plot_importance
-# from sklearn.grid_search import GridSearchCV
 import matplotlib.pyplot as plt
 import matplotlib.transforms as transforms
-from datetime import datetime
-import json
-# import pyodbc
-import os
-import sys
 import shap  # for  the Shap charts of course!
-# import random
-# import time
-# from subprocess import check_output
-# from numpy import genfromtxt
-# import seaborn as sns
 from sklearn import preprocessing
-# from operator import itemgetter
 import sweetviz
-#from autoviz.AutoViz_Class import AutoViz_Class
+# Report the below as bug...when uncommented, this will delay all chart
+#  Displays until the program finishes, then, all charts desplay in order.
+# from autoviz.AutoViz_Class import AutoViz_Class
 
-import warnings
-warnings.filterwarnings(action='ignore', category=UserWarning)
+# warnings.filterwarnings(action='ignore', category=UserWarning)
 
-# import pandas_profiling as pp
+import pandas_profiling as pp
 os.environ["PATH"] += os.pathsep + 'c:/Program Files (x86)/Graphviz/bin/'
 FIGNBR = 0
 
@@ -92,8 +85,6 @@ def setstartingconditions():
     """Print to console package versions plus more."""
     pd.set_option('display.max_columns', 500)
     pd.set_option('display.width', 1000)
-    # rcParams['figure.figsize'] = 12, 12
-    # plot_tree(xgb._Booster)
     start1 = datetime.now()
     print(start1.strftime('%a, %d %B, %Y', ))
     print(start1.strftime('%c'))
@@ -103,13 +94,10 @@ def setstartingconditions():
         thisfile = os.path.basename(__file__)
     except NameError:
         thisfile = 'working'
-    # else:
-    #     thisfile = 'unk'
 
     model = xgb.XGBClassifier
     txtmodel = str(model).replace('<class \'', '')
     txtmodel = str(txtmodel).replace('\'>', '')
-#    print(__doc__)
 
     pver = str(format(sys.version_info.major) + '.' +
                format(sys.version_info.minor) + '.' +
@@ -122,54 +110,45 @@ def setstartingconditions():
     # plt.style.use('ggplot') # this is used for ALL future plt plots...
     plt.style.use('classic')  # this is used for ALL future plt plots...
 
-    # csfont = {'fontname': 'Comic Sans MS'}
-    # font = {'family': 'monospace',
-    #         'weight': 'normal',
-    #         'size': 12,
-    #         }
     return txtmodel, model, mdlsttime1, thisfile, start1
 
 # %% EDA --> Charts Exploratory Data Analysis
 
 
-def plot_histograms_stacked(bigcr, smlcr, bins=100,
+def plot_histograms_stacked(bigcrsh, smlcrsh, bins=100,
                             title='Fig 1: Actual Accidents vs speed',
                             xlabel='Vehicle speed'):
     """
-    Bigcr and smlcr: what you want plotted.
+    Blue/Red histogram (stacked) of crashes (blue is safe, red is bad).
 
     Parameters
     ----------
-    bigcr : integer
-        Crash where veh damage>10000, or person is injured.
-    smlcr : int
-        Reverse of big crash.
-    bins : int, optional
-        How many 'bins' would you like. The default is 100.
-    title : str, optional
-        Example: The default is 'Fig 1: Actual Accidents vs speed'.
-    xlabel : str, optional
-        DESCRIPTION. The default is 'Vehicle speed'.
+    bigcrsh : int --> Crashes where veh damage>10000, or person is injured.
+                    This is a series of veh speeds between 0 and 100.
+    smlcrsh : int --> Reverse of big crash.
+    bins  : int, optional --> How many 'bins' would you like. The default is 100.
+    title : str, optional --> The default is 'Fig 1: Actual Accidents vs speed'.
+    xlabel : str, optional -> The default is 'Vehicle speed'.
 
     Returns
     -------
     None.
 
     """
-    fig, ax = plt.subplots(2, 1, figsize=(16, 12))
+    fig, axs = plt.subplots(2, 1, figsize=(16, 12))
     colors = ['blue', 'red']
-    labels = f'{len(smlcr)} little crashes', f'{len(bigcr)} big crashes'
+    labels = f'{len(smlcrsh)} little crashes', f'{len(bigcrsh)} big crashes'
     global FIGNBR
     FIGNBR += 1
     title = f'Fig {FIGNBR}: Actual Accidents vs speed'
-    ax[0].set_title(title, fontsize=24)
+    axs[0].set_title(title, fontsize=24)
     # plt.xticks(np.arange(0, 100, 10))
-    ax[0].set_xlabel(xlabel)
-    ax[1].set_xlabel(labels)
-    ax[0].hist([smlcr, bigcr], bins=bins, stacked=True,
-               color=colors)  # ,  width=.5)
-    ax[1].hist([smlcr, bigcr], bins=bins, stacked=True, log=True, color=colors,
-               label=labels)  # , width=.5)
+    axs[0].set_xlabel(xlabel)
+    axs[1].set_xlabel(labels)
+    axs[0].hist([smlcrsh, bigcrsh], bins=bins, stacked=True,
+                color=colors)  # ,  width=.5)
+    axs[1].hist([smlcrsh, bigcrsh], bins=bins, stacked=True, log=True, color=colors,
+                label=labels)  # , width=.5)
     plt.legend(prop={'size': 16})
     plt.grid()
     # Next line minimizes 'padding' size outside of actual chart
@@ -179,23 +158,32 @@ def plot_histograms_stacked(bigcr, smlcr, bins=100,
 
 
 def plot4histograms():
-    """1st plot is 4 subplots: speed, driverage, veh age & hour of the day."""
-    # #1...
-    j = pd.concat([X_test['vehmph'], y_test], axis=1)
-    bigcrsh = j.vehmph[j.crash == 1]
-    ltlcrsh = j.vehmph[j.crash == 0]
+    """Create 4 histogram graphs: assumes the pr dataframe variable.
+
+    First:  The Red/Blue histogram only on the test data only.
+    Second: 4 subplots in one: speed, driverage, veh age & hour of the day
+    Third:  Speed vs Drivers condition.
+    Fourth: Compare HitNRuns to speed.
+
+    Uses global variables lets fix that soon!
+    """
+    # #1... First look at the test data, is it 'like' the full data set?
+    crs = pd.concat([X_test['vehmph'], y_test], axis=1)
+    bigcrsh = crs.vehmph[crs.crash == 1]
+    ltlcrsh = crs.vehmph[crs.crash == 0]
     global FIGNBR
     plot_histograms_stacked(
         bigcrsh, ltlcrsh,
         title=f'Fig {FIGNBR}: TEST Data-what the validation data looks like...')
     plt.show()
-    # #2
+    # #2 Just pulls the non categorical columns. (ie numerical: speed age, hour)
     kwargs = dict(histtype='stepfilled', alpha=0.8, bins=90)
     labels = f'{pr.shape[0]} crashes'
-    pr.hist(**kwargs)
+    pr[['vehmph', 'drvage', 'vehage', 'dayhour']].hist(**kwargs)
     FIGNBR += 1
     plt.subplots_adjust(left=.1, right=.9)
-    plt.suptitle(f'Fig {FIGNBR}: The Four integer factors')
+    plt.suptitle(f'Fig {FIGNBR}: The Four integer factors, All data, both big'
+                 ' & small crashes.')
     plt.xlabel(f'{labels}')
     plt.show()
     # #3... the 'Drivers Situation' has 3 cases: Normal, unk,
@@ -211,8 +199,6 @@ def plot4histograms():
     plt.show()
 
 
-# X_test.hist(['vehmph'], bins=90, width=.5)  # already shown via plot_histogram
-# X_test.hist(['vehmph'], **kwargs)  # already shown via plot_histogram
 # https://towardsdatascience.com/powerful-eda-exploratory-data-analysis-in-just-two-lines-of-code-using-sweetviz-6c943d32f34
 
 
@@ -228,15 +214,19 @@ def my_sweetviz():
     sweet_train.head()
     feature_config \
         = sweetviz.FeatureConfig(
-            skip=['hitrun_No', 'drvagegrp_older', 'rdSurfac_oil', 'rdSurfac_mud_dirt_gravel',
-                  'rdSurfac_ice_frost', 'rdSurfac_Unk', 'rdSurfac_Water', 'rdSurfac_Sand',
-                  'rdSurfac_Other', 'drvsex_Female', 'Vision_clear', 'drSitu_unknown',
-                  'drDistract_No', 'license_valid', 'vhmtn_Working', 'vhmtn_Unknown',
-                  'vhmtn_Parked', 'vhmvnt_U_turning', 'vhmvnt_StopInTraf', 'vhmvnt_Passing',
-                  'vhmvnt_Parked', 'vhmvnt_ExitTrfc', 'vhmvnt_EnterTrfc', 'UrbanLoc_No',
-                  'light_unk', 'light_dawn', 'weather_danger', 'vehmakegrp_Chrysler',
+            skip=['hitrun_No', 'drvagegrp_older', 'rdSurfac_oil',
+                  'rdSurfac_mud_dirt_gravel', 'rdSurfac_ice_frost',
+                  'rdSurfac_Unk', 'rdSurfac_Water', 'rdSurfac_Sand',
+                  'rdSurfac_Other', 'drvsex_Female', 'Vision_clear',
+                  'drSitu_unknown', 'drDistract_No', 'license_valid',
+                  'vhmtn_Working', 'vhmtn_Unknown', 'vhmtn_Parked',
+                  'vhmvnt_U_turning', 'vhmvnt_StopInTraf', 'vhmvnt_Passing',
+                  'vhmvnt_Parked', 'vhmvnt_ExitTrfc', 'vhmvnt_EnterTrfc',
+                  'UrbanLoc_No', 'light_unk', 'light_dawn', 'weather_danger',
+                  'vehmakegrp_Chrysler',
                   'vehmakegrp_Euro', 'vehmakegrp_Volvo', 'vehmakegrp_Korean',
-                  'vehmakegrp_Volvo', 'wday_Monday', 'wday_Tuesday', 'wday_Wednesday',
+                  'vehmakegrp_Volvo', 'wday_Monday', 'wday_Tuesday',
+                  'wday_Wednesday',
                   'wday_Thursday', 'wday_Saturday', 'wday_Sunday', 'vehtype_other',
                   'vehtype_truck', 'vehtype_van'])
     my_report = sweetviz.compare([sweet_train, "Train"],
@@ -256,10 +246,10 @@ def myautoviz():
     None.
 
     """
-    AV = AutoViz_Class()
+    avz = AutoViz_Class()
 
     # Creates automated visualizations NEXT:  Can we do it with the df...
-    AV.AutoViz('D:/ML/Python/data/traffic/traffic236k_95_16.csv')
+    avz.AutoViz('D:/ML/Python/data/traffic/traffic236k_95_16.csv')
 
 
 def mypandaprofile():
@@ -288,14 +278,15 @@ def plot_learningcurves_logloss_classerror():
             'size': 12,
             }
     conmtrx = confusion_matrix(y_test, predictions)
-    mc = 100 * round(matthews_corrcoef(y_test, predictions), 4)
+    mtc = 100 * round(matthews_corrcoef(y_test, predictions), 4)
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 12))
     plt.rcParams.update({'figure.autolayout': True})
     global FIGNBR
     FIGNBR += 1
-    fig.suptitle(f'Fig #{FIGNBR}:   Accuracy: {round(accuracy,3)} LEARNING CURVES {mdlsttime}' +
-                 f'  Last tree: {xgb1.get_booster().best_iteration}' +
+    fig.suptitle(f'Fig #{FIGNBR}:   Accuracy: {round(accuracy,3)} '
+                 f'LEARNING CURVES {mdlsttime}'
+                 f'  Last tree: {xgb1.get_booster().best_iteration}'
                  f'\n{filename};  TrainingTime: {mdlTngTime}; Model: {txtmdl}',
                  fontsize=20)
     trans1 = transforms.blended_transform_factory(ax1.transAxes, ax1.transAxes)
@@ -310,7 +301,7 @@ def plot_learningcurves_logloss_classerror():
              wrap=True, va='top', fontsize=14, transform=trans1,
              bbox=dict(facecolor='aqua', alpha=0.5))  # , font=font)  #\
     ax1.text(.05, 0.25, transform=trans1,
-             s='ax.plot(x_axis, results[\'validation_0\'][\'logloss\'],' +
+             s='ax.plot(x_axis, results[\'validation_0\'][\'logloss\'],'
              'label=\'Train\')\nTell .fit() to get metric data...'
              '\nxgb.fit(X_train, y_train, eval_metric=["error", "logloss"]'
              f'\n\n{SQL} \n{SqlParameters}', wrap=True,
@@ -319,13 +310,14 @@ def plot_learningcurves_logloss_classerror():
     ax1.text(0.95, .80, hitnmiss, ha='right', transform=trans1,
              bbox=dict(facecolor='pink', alpha=0.5), fontsize=20)  # ,
     ax1.text(0.95, .60, ha='right', transform=trans1,
-             s=f'Confusion Matrix\n{conmtrx[0,0]} {conmtrx[0,1]}\n{conmtrx[1,0]} {conmtrx[1,1]}',
+             s=f'Confusion Matrix\n{conmtrx[0,0]} {conmtrx[0,1]}\n'
+             f'{conmtrx[1,0]} {conmtrx[1,1]}',
              fontsize=20, bbox=dict(facecolor='pink', alpha=0.5))  #
 
     ax2.text(.15, .95, '   Categorical Features:\n' + categoricalVariablesList,
              ha='left', transform=trans2, font=font, va='top',
              bbox=dict(facecolor='yellow', alpha=0.5))  #
-    ax2.text(0.15, .55, s=f'MathewsCoef={round(mc,2)}', ha='left', transform=trans2,
+    ax2.text(0.15, .55, s=f'MathewsCoef={round(mtc,2)}', ha='left', transform=trans2,
              bbox=dict(facecolor='pink', alpha=0.5), fontsize=20)
     ax2.text(0.05, .5, s=explainlearncurve, ha='left', transform=trans2, va='top',
              bbox=dict(facecolor='mediumseagreen', alpha=0.5), fontsize=11)
@@ -338,10 +330,10 @@ def plot_learningcurves_logloss_classerror():
     ax2.legend(loc="best")
     fig.tight_layout()
     plt.show()
-#plot_learningcurves_logloss_classerror()
+# plot_learningcurves_logloss_classerror()
 
 
-def ROC_rcvr_operating_curve(model):
+def roc_rcvr_operating_curve(model):
     """Receiver Operating Characteristics...maximize the area under the curve."""
     font = {'family': 'monospace',
             'weight': 'normal',
@@ -352,15 +344,15 @@ def ROC_rcvr_operating_curve(model):
     # fpr_xgb, tpr_xgb, _ = sklearn.metrics.roc_curve(y_test, predictions)
     # roc_auc = auc(fpr_xgb, tpr_xgb)
     fig = plt.figure(figsize=(16, 12))
-    lw = 2
+    lw3 = 2
     pt2tr = 1
     parms = {"color": 'black'}
     plt.rcParams.update({'figure.autolayout': True})
 
     plot_roc_curve(model, X_test, y_test, **parms)
     # plt.plot(fpr_xgb, tpr_xgb, color='darkorange',
-    #          lw=lw, label='ROC curve (area = %0.2f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], color='navy', lw=lw, linestyle='--')
+    #          lw=lw3, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], color='navy', lw=lw3, linestyle='--')
     plt.text(pt2tr, .9, horizontalalignment='right',
              s=(f'Test Accuracy: {round(accuracy,3)}'
                 f' at: {dt_string}\nModel training time: {mdlTngTime};'
@@ -393,12 +385,12 @@ def ROC_rcvr_operating_curve(model):
     plt.show()
 
 
-def plot_ConfusionMatrixChart(MLmodel):
+def plot_confusionmatrix_chart(ml_model):
     """Create two images... 1 raw numbers, 1 by percent.
 
     Keyword Arguments:
     -----------------
-    MLmodel -- Example: xgb1
+    ml_model -- Example: xgb1
 
     To Do:
     Add data, color, title parameters
@@ -406,7 +398,6 @@ def plot_ConfusionMatrixChart(MLmodel):
 
     """
     plt.rcParams.update({'figure.autolayout': False})
-    # cm = confusion_matrix(y_test, predictions)
     global FIGNBR
     FIGNBR += 1
     ttltxt = f'Fig {FIGNBR}: XGBoost: {mdlsttime}\nConfusion matrix, w/o normalization'
@@ -415,7 +406,7 @@ def plot_ConfusionMatrixChart(MLmodel):
     titles_options = [(ttltxt, None), (ttltxt2, 'true')]
     # plt.rcParams.update({'font.size': 22})  # increase/set internal fonts
     for title, normalize in titles_options:
-        disp = plot_confusion_matrix(MLmodel, X_test, y_test,
+        disp = plot_confusion_matrix(ml_model, X_test, y_test,
                                      display_labels=class_names_gnb,
                                      cmap=mpl.cm.Blues,
                                      normalize=normalize,
@@ -430,7 +421,7 @@ def plot_ConfusionMatrixChart(MLmodel):
                  bbox=dict(facecolor='green', alpha=0.5))  # fontsize=14,
         plt.text(.41, 1.55, xgbreport, horizontalalignment='right', fontsize=8,
                  bbox=dict(facecolor='blue', alpha=0.3))
-        plt.text(.55, .44, keyparams, horizontalalignment='left',
+        plt.text(.55, .44, KEYPARAMS, horizontalalignment='left',
                  bbox=dict(facecolor='aqua', alpha=.5))
         plt.text(-.6, .64, SQLCommand, horizontalalignment='left', wrap=True,
                  bbox=dict(facecolor='aqua', alpha=.5), fontsize=7)
@@ -454,10 +445,8 @@ def plot_calibration_curve(est, mdlname):
         sigmoid takes a lot of time, and by docs, doesn't help in this case
     """
     calstart = datetime.now()
-
     # Calibrated with isotonic calibration
     isotonic = CalibratedClassifierCV(est, cv=2, method='isotonic')
-
     # Calibrated with sigmoid calibration
 #   sigmoid = CalibratedClassifierCV(est, cv=2, method='sigmoid')
 
@@ -520,10 +509,9 @@ https://scikit-learn.org/stable/modules/calibration.html'''
     ax2.legend(loc="upper center", ncol=2)
 
     plt.tight_layout()
-# plot_calibration_curve(xgb1, 'sboot')
 
 
-def plot_2confidenceHistograms():
+def plot_2confidence_histograms():
     """Depends on xgb1 exisiting...ok, parameterize this ASAP."""
     lst = xgb1.predict_proba(X_test)[:, 1]
     lst.sort()
@@ -531,8 +519,8 @@ def plot_2confidenceHistograms():
     ttl = len(lst)
     midl = int(ttl / 2)
     fst = lst[:midl]
-    Lst = lst[midl + 1:ttl]
-    tst = [fst, Lst]
+    last = lst[midl + 1:ttl]
+    tst = [fst, last]
     cmap = ['black', 'blue']
     global FIGNBR
     FIGNBR += 1
@@ -551,8 +539,8 @@ def plot_2confidenceHistograms():
     mid = np.searchsorted(lst, .5)
     fst = lst[:mid]
     doubtful = lst[mid + 1:midl]
-    Lst = lst[midl + 1:14999]
-    tst = [fst, doubtful, Lst]
+    last = lst[midl + 1:14999]
+    tst = [fst, doubtful, last]
     # N, bins, patches =
     plt.hist(tst, bins=50,  # histtype='step',
              color=cmap, rwidth=(1),
@@ -699,14 +687,14 @@ def plot_scalability_performance(estimator, trndata, trntarget, axes=None,
 
 def treeplotter(gbm, num_boost_round, tree_nbr, txt_params):
     """Not using this one...(re-look this)."""
-    fig, ax = plt.subplots(figsize=(40, 10))
+    fig, axs = plt.subplots(figsize=(40, 10))
     plt.rcParams.update({'figure.autolayout': True})
-    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
-    xgb.plot_tree(gbm, num_trees=tree_nbr, ax=ax)
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    xgb.plot_tree(gbm, num_trees=tree_nbr, ax=axs)
     plt.title(
         f'File: {filename};  {mdl} Tree# "first";  {mdlsttime}', fontsize=32)
     plt.text(.9, .9, horizontalalignment='right', transform=trans,
-             s=f'Max # Boosters: {num_boost_round};\nLast "tree":' +
+             s=f'Max # Boosters: {num_boost_round};\nLast "tree":'
              ' {gbm.best_iteration}; ',
              fontsize=24, bbox=dict(facecolor='pink', alpha=0.5))
     plt.text(.1, .9, f'Model Params:\n{txt_params}', horizontalalignment='left',
@@ -716,7 +704,8 @@ def treeplotter(gbm, num_boost_round, tree_nbr, txt_params):
 
 
 def plot_tree(tree2plot, graphdir):  # Chart #12
-    """ We are using xgboost's plot tree.  sklearn has one also...
+    """We are using xgboost's plot tree.  sklearn has one also...
+
     https://scikit-learn.org/stable/modules/generated/sklearn.tree.plot_tree.html
     """
     global FIGNBR
@@ -724,14 +713,13 @@ def plot_tree(tree2plot, graphdir):  # Chart #12
     tree_end = datetime.now()
     now = tree_end.strftime('%c')
     plt.subplots_adjust(left=.05, right=.95, top=.1, bottom=.005)
-    #tree2plot = tree2plot
     if graphdir == 'LR':
-        fig, ax = plt.subplots(figsize=(50, 40))
+        fig, axs = plt.subplots(figsize=(50, 40))
     else:
-        fig, ax = plt.subplots(figsize=(50, 50))
+        fig, axs = plt.subplots(figsize=(50, 50))
     plt.rcParams.update({'figure.autolayout': False})
-    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
-    xgb.plot_tree(xgb1, num_trees=tree2plot, rankdir=graphdir, ax=ax)
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    xgb.plot_tree(xgb1, num_trees=tree2plot, rankdir=graphdir, ax=axs)
     if graphdir == 'LR':  # ie build tree Left to Right
         plt.title(f'Fig: {FIGNBR} File: {filename};  Mdl: XGboost;  {now}',
                   fontsize=64)
@@ -743,7 +731,8 @@ def plot_tree(tree2plot, graphdir):  # Chart #12
                  fontsize=48, bbox=dict(facecolor='pink', alpha=0.5))  #
         plt.xlabel('Chart #12')
     else:  # ie 'wide'
-        plt.title(f'Fig: {FIGNBR} File: {filename};  Mdl: XGboost Tree# "first";  {now}',
+        plt.title(f'Fig: {FIGNBR} File: {filename};  Mdl: XGboost Tree#'
+                  f' "first";  {now}',
                   fontsize=64)
         plt.text(.95, .8, ha='right', transform=trans, va='top',
                  s=f'Max # Boosters: 3;\nLast "tree": {tree2plot}; ',
@@ -761,6 +750,21 @@ def plot_tree(tree2plot, graphdir):  # Chart #12
 
 
 def plot_permutationimportancechart(fn_durationseconds):
+    """Create one chart showing 'permutation importances'.
+
+    This also creates two outputs needed by the 'comparison graph'
+
+    Parameters
+    ----------
+    fn_durationseconds : int --> the # seconds needed to compute permutations.
+
+    Returns
+    -------
+    result : "Bunch object of sklearn.utils module" (3 items)
+        Importances: array (88, 10);  Importances_mean (88); ImpStd(88)
+    sorted_idx2 : array; --> 25 integers (order of feature importance).
+
+    """
     # plt.rcdefaults()
     global FIGNBR
     FIGNBR += 1
@@ -772,13 +776,12 @@ def plot_permutationimportancechart(fn_durationseconds):
     fig, ax1 = plt.subplots()
     ax1.boxplot(result.importances[sorted_idx2].T,
                 vert=False, labels=X_test.columns[sorted_idx2])
-    # ax1.set_title(f"Permutation Importances (test set) Accuracy: {round(accuracy,3)}")
-    ax1.set_title(f'Fig #{FIGNBR} Permutation Importances (test set) \n' +
+    ax1.set_title(f'Fig #{FIGNBR} Permutation Importances (test set) \n'
                   f'  Accuracy is: {round(accuracy,3)} at: {now}', fontsize=14)
     plt.yticks(fontsize=9, rotation=15)
     plt.xticks(fontsize=10)
 
-    plt.text(.05, 18, 'Notice the difference between \n"permutted importances"' +
+    plt.text(.05, 18, 'Notice the difference between \n"permutted importances"'
              ' and "Feature importance!"\n learn the difference!', fontsize=12,
              horizontalalignment='left', verticalalignment='bottom',
              bbox=dict(facecolor='yellow', alpha=0.5))
@@ -787,8 +790,6 @@ def plot_permutationimportancechart(fn_durationseconds):
              horizontalalignment='left', verticalalignment='bottom',
              bbox=dict(facecolor='yellow', alpha=0.5))
 
-    # plt.text(0.05,4, xgb_variables, horizontalalignment='left',
-    #          bbox=dict(facecolor='green', alpha=0.5))  # fontsize=14,
     plt.text(.05, 8, xgbreport, horizontalalignment='left', fontsize=11,
              bbox=dict(facecolor='blue', alpha=0.3))
     fig.tight_layout()
@@ -799,7 +800,6 @@ def plot_permutationimportancechart(fn_durationseconds):
     plt.xlabel(f'Chart #13 Duration: {txtduration}')
     plt.show()
     return result, sorted_idx2
-
 # plot_PermutationImportancechart(45.0002)
 
 
@@ -839,9 +839,9 @@ def plot_feature_importance(num_features, imptyp):
             'go through those splits.')
 
     pt2tr = .98  # place text to the right  (right align in the graph...)
-    fig, ax = plt.subplots(figsize=(12, 8))
-    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
-    plot_importance(booster=xgb1, max_num_features=num_features, ax=ax,
+    fig, axs = plt.subplots(figsize=(12, 8))
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    plot_importance(booster=xgb1, max_num_features=num_features, ax=axs,
                     title=f'Feature importance {now}', importance_type=imptyp,
                     show_values=False)
     plt.yticks(fontsize=10, rotation=20)
@@ -851,16 +851,11 @@ def plot_feature_importance(num_features, imptyp):
     plt.title(f'Fig: #{FIGNBR} xgboost Feature importance {now};'
               f' Importance_Type: {imptyp}',
               fontsize=16)
-    # plt.text(pt2tr, .75, transform=trans,
-    #           s=f'Test Accuracy: {round(accuracy_score(y_test, y_pred),3)}' +
-    #           f' at: {dt_string}\n{os.path.basename(__file__)}',
-    #           horizontalalignment='right',
-    #           font={'size': 16}, bbox=dict(facecolor='pink', alpha=0.5))  #
-    ax.text(pt2tr, .8, measurement, ha='right', va='bottom', fontsize=11,
-            bbox=dict(facecolor='mediumseagreen', alpha=0.3), transform=trans)
-    ax.text(pt2tr, .5, xgbreport, horizontalalignment='right', fontsize=11,
+    axs.text(pt2tr, .8, measurement, ha='right', va='bottom', fontsize=11,
+             bbox=dict(fc='mediumseagreen', alpha=0.3), transform=trans)
+    axs.text(pt2tr, .5, xgbreport, horizontalalignment='right', fontsize=11,
             bbox=dict(facecolor='blue', alpha=0.3), transform=trans)
-    plt.text(pt2tr, .4, keyparams, ha='right', transform=trans,
+    plt.text(pt2tr, .4, KEYPARAMS, ha='right', transform=trans,
              bbox=dict(facecolor='pink', alpha=0.5), font=font)
     plt.text(.7, .4, hitnmiss, ha='right', transform=trans,
              bbox=dict(facecolor='pink', alpha=0.5), font=font)
@@ -873,11 +868,11 @@ def plot_feature_importance(num_features, imptyp):
              font=font, bbox=dict(facecolor='pink', alpha=0.5))  #
     plt.text(pt2tr, .2, SQLCommand, ha='right', transform=trans,
              bbox=dict(facecolor='pink', alpha=0.5), font=font)  # fontsize=14,
-    plt.text(pt2tr, .1, 'Height set by scale of 0 to 1 (ax.Transform)',
+    plt.text(pt2tr, .1, 'Height set by scale of 0 to 1 (axs.Transform)',
              ha='right', bbox=dict(facecolor='pink', alpha=0.5),
              font=font, transform=trans)  #
     plt.text(pt2tr, 0.05, transform=trans, ha='right',
-             s='plot_importance(xgb, num_features=max_ftrs, ax=ax,\'...',
+             s='plot_importance(xgb, num_features=max_ftrs, ax=axs,\'...',
              # Top {nmbrFtrs2List} Importance of Features')))',
              font=font, bbox=dict(facecolor='pink', alpha=0.5))  #
     plt.text(.33, .1, hitnmiss, ha='left', transform=trans,
@@ -886,7 +881,22 @@ def plot_feature_importance(num_features, imptyp):
     plt.show()
 
 
-def plot_sidebyside_feature_importanceVSpermutation(num_features):
+def plot_sidebyside_feature_importance_vs_permutation(num_features):
+    """
+    Create two charts to compare two different 'Importances.'.
+
+    Note: this depends on the Permutation Importances graph code creating two
+    variables: 'result' and 'sorted_idx'
+
+    Parameters
+    ----------
+    num_features : int --> the number of features displayed on the y axis.
+
+    Returns
+    -------
+    None.
+
+    """
     # Below link says possibly greater value examining permutation importance
     # https://scikit-learn.org/stable/auto_examples/inspection/plot_permutation_importance.html#
     # https://scikit-learn.org/stable/auto_examples/inspection/plot_permutation_importance_multicollinear.html#sphx-glr-auto-examples-inspection-plot-permutation-importance-multicollinear-py
@@ -895,7 +905,7 @@ def plot_sidebyside_feature_importanceVSpermutation(num_features):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 12))
     fig.subplots_adjust(top=.75)
     plot_importance(xgb1, max_num_features=num_features, ax=ax1)
-    plt.suptitle(f'Fig: {FIGNBR} Camparison of "Importances" ', y=.98)
+    plt.suptitle(f'Fig: {FIGNBR} Comparison of "Importances" ', y=.98)
     ax1.set_title('Feature importance',
                   fontdict={'fontsize': 14, 'color': 'r'})
     ax2.set_title('Permutation importance',
@@ -908,19 +918,14 @@ def plot_sidebyside_feature_importanceVSpermutation(num_features):
     ax2.set_xlabel('Chart #17')
     # fig.tight_layout()
     plt.show()
-# plot_sidebyside_feature_importanceVSpermutation(17)
+# plot_sidebyside_feature_importance_vs_permutation(17)
 # https://slundberg.github.io/shap/notebooks/Census%20income%20classification%20with%20XGBoost.html
 
 # %% EXP2 --> Shaply charts
 
 
-def plot_SHAP_charts(shapvalues_df):
+def plot_SHAP_charts():
     """Plot 3 shap charts.
-
-    Parameters
-    ----------
-    shapvalues_df : dataframe  4 columns, 1 record for each feature
-        Variable  SHAP_abs      Corr  Sign.  "Variable" is feature.
 
     Returns
     -------
@@ -929,8 +934,6 @@ def plot_SHAP_charts(shapvalues_df):
     plt.rcParams.update({'figure.autolayout': True})
     global FIGNBR
     FIGNBR += 1
-#    fig, ax = plt.subplots(figsize=(12, 12))
-#    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
     plt.rcParams.update({'figure.autolayout': True})
     plt.title(f'Fig: {FIGNBR} XGBoost Shap values; {filename}; \n {txtmdl}  '
               f'On: {dt_string}', fontsize=14)
@@ -938,7 +941,7 @@ def plot_SHAP_charts(shapvalues_df):
     shap.summary_plot(shap_values, X, plot_type="bar")
     plt.show()
 
-    fig, ax = plt.subplots()
+    # fig, axs = plt.subplots()
     # density scatter plot of SHAP values for each feature to identify how much
     # impact each feature has on the model output for individuals in the
     # validation dataset. Features are sorted by the sum of the SHAP value
@@ -946,7 +949,7 @@ def plot_SHAP_charts(shapvalues_df):
     # Note that when the scatter points don't fit on a line they pile up to
     # show density, and the color of each point represents the feature value
     # of that individual.
-#    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
+
     plt.rcParams.update({'figure.autolayout': True})
     FIGNBR += 1
     plt.title(f'Fig: {FIGNBR} XGBoost Shap values; {filename}; \n {txtmdl}'
@@ -955,12 +958,21 @@ def plot_SHAP_charts(shapvalues_df):
     shap.summary_plot(shap_values, X)
     plt.show()
 
-    # Following: 'fig: 20'
     # 'magically two charts in one, they share an axis,
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 16))
     FIGNBR += 1
+    fig = plt.figure(figsize=(10, 15))
     fig.suptitle(f'Fig: {FIGNBR} Shap barchart vs the "summary_plot"')
-    shap.summary_plot(shap_values, X)  # this is on the right side
+    ax1 = fig.add_subplot(121)
+    shap.summary_plot(shap_values, X, plot_type="bar", show=False)
+    ax1.title.set_text('The Bar')
+    ax1.tick_params(labelsize=10, labelcolor='black', labelrotation=45)
+    ax1.set_xlabel('mean shap value (avg impact')
+
+    ax2 = fig.add_subplot(122)
+    shap.summary_plot(shap_values, X, show=False)
+    ax2.title.set_text('The Summary version')
+    ax2.tick_params(labelsize=10, labelcolor='blue', labelrotation=45)
+    plt.tight_layout()
     plt.show()
 
 # https://slundberg.github.io/shap/notebooks/plots/dependence_plot.html
@@ -1000,6 +1012,72 @@ def plot_SHAP_charts2():
 #    return shap_values
 
 
+def heterogeneity():
+    """Graph shows heterogeneity.
+
+    Returns
+    -------
+    None.
+
+    """
+    # https://medium.com/dataman-in-ai/the-shap-with-more-elegant-charts-bc3e73fa1c0c
+    global FIGNBR
+    explanation = ('The threshold of this optimal division is speed=20 mph. The bar '
+                   '\nplot tells us that the reason to go to the cohort of speed>20'
+                   '\nis because of vehicle age (SHAP = 0.2), older driver '
+                   '(SHAP = 0.19)\nand urban location(no) (SHAP = 0.18), etc.')
+    shap.plots.bar(waterfall_values.cohorts(2).abs.mean(0), show=False)
+    fig = plt.gcf()  # gcf means "get current figure"
+    fig.set_figheight(8)
+    fig.set_figwidth(11)
+    fig.tight_layout()
+    # plt.rcParams['font.size'] = '12'
+    axs = plt.gca()  # gca means "get current axes"
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    axs.legend(loc='center right')  # bbox_to_anchor=(0., 2.02, 1., .102))
+    FIGNBR += 1
+    plt.title(f'Fig {FIGNBR}: insights into the heterogeneity of accidents',
+              fontsize=24)
+    plt.text(.15, .75, horizontalalignment='left', transform=trans,
+             s=explanation, va='top',
+             fontsize=14, bbox=dict(facecolor='aqua', alpha=0.5))  #
+    plt.show()
+
+
+def shapwaterfall(item=1):
+    """Chart how a particular decision is made.
+
+    Parameters
+    ----------
+    item : int, optional
+        Select the number of a crash. The default is 1.
+
+    Returns
+    -------
+    None.
+
+    """
+    global FIGNBR
+    explanation = ('Blue arrows to the "left" yield increasing safety. '
+                   '\nRed arrows to the "right" yield increasing danger.')
+    shap.plots.waterfall(waterfall_values[item], show=False)
+    fig = plt.gcf()  # gcf means "get current figure"
+    fig.set_figheight(8)
+    fig.set_figwidth(11)
+    fig.tight_layout()
+    # plt.rcParams['font.size'] = '12'
+    axs = plt.gca()  # gca means "get current axes"
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    axs.legend(loc='center right')  # bbox_to_anchor=(0., 2.02, 1., .102))
+    FIGNBR += 1
+    plt.title(f'Fig {FIGNBR}: Decision criteria for crash {item}',
+              fontsize=18)
+    plt.text(.05, .05, horizontalalignment='left', transform=trans,
+             s=explanation, va='bottom',
+             fontsize=14, bbox=dict(facecolor='aqua', alpha=0.5))  #
+    plt.show()
+
+
 def ABS_SHAP(float_array, training_dataframe):
     """Create all the shap values for each record (big df).
 
@@ -1024,7 +1102,6 @@ def ABS_SHAP(float_array, training_dataframe):
 
     shap_v, shap_abs, shapvaluesdf, colorlist
     """
-    # import matplotlib as plt
     # Make a copy of the input data
     df_shap = pd.DataFrame(float_array)  # ~235,983 (ie each crash x 88 columns)
     feature_list = training_dataframe.columns
@@ -1034,8 +1111,8 @@ def ABS_SHAP(float_array, training_dataframe):
     # Determine the correlation in order to plot with different colors
     corr_list = list()
     for i in feature_list:
-        b = np.corrcoef(df_shap[i], df_v[i])[1][0]
-        corr_list.append(b)
+        bst = np.corrcoef(df_shap[i], df_v[i])[1][0]
+        corr_list.append(bst)
     corr_df = pd.concat([pd.Series(feature_list),
                          pd.Series(corr_list)], axis=1).fillna(0)
     # Make a data frame. Column 1 is the feature,
@@ -1054,29 +1131,6 @@ def ABS_SHAP(float_array, training_dataframe):
     return df_shap, shapvalues_df, shapcolorlist
 
 
-    # Plot it
-    # ax = shapvalues_df.plot.barh(x='Variable', y='SHAP_abs', color=colorlist,
-    #                   figsize=(5, 6), legend=False)
-    # ax.set_xlabel("SHAP Value (Red = Positive Impact)")
-    # ax.set_ylabel('SHAP_abs', fontsize=8)
-
-# The following doesn't work...and won't until 2021 from Carlos Cordoba
-# shap.force_plot(explainer.expected_value, shap_values[0,:], X.iloc[0,:])
-# plt.show()
-# shap.TreeExplainer
-# alias of shap.explainers._tree.Tree
-# shap.GradientExplainer
-# alias of shap.explainers._gradient.Gradient
-# shap.DeepExplainer
-# alias of shap.explainers._deep.Deep
-# shap.KernelExplainer
-# alias of shap.explainers._kernel.Kernel
-# shap.SamplingExplainer
-# alias of shap.explainers._sampling.Sampling
-# shap.PartitionExplainer
-# alias of shap.explainers._partition.Partition
-
-
 def plot_tree2():
     """Found that this is not working... not sure why. Fix later.
 
@@ -1088,10 +1142,10 @@ def plot_tree2():
     ptend = datetime.now()
     now = ptend.strftime('%c')
     tree2plot = 100
-    fig, ax = plt.subplots(figsize=(40, 10))
+    fig, axs = plt.subplots(figsize=(40, 10))
     plt.rcParams.update({'figure.autolayout': False})
-    trans = transforms.blended_transform_factory(ax.transAxes, ax.transAxes)
-    xgb.plot_tree(xgb, num_trees=tree2plot, ax=ax)
+    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
+    xgb.plot_tree(xgb, num_trees=tree2plot, ax=axs)
     plt.title(f'File: {filename};  {mdl} Tree# "first";  {now}', fontsize=32)
     plt.text(.9, .8, horizontalalignment='right', transform=trans,
              s=f'Max # Boosters: 3;\nLast "tree": {tree2plot}; ',
@@ -1112,6 +1166,8 @@ def getdata(records):
     ----------
     records : int
         One half number of records that you want to retrieve.
+    I am leaving in the SQL calls & code as examples.  After i was satisfied
+    with the data, i pushed it into a csv for convenience and for portability.
 
     Returns
     -------
@@ -1137,18 +1193,18 @@ def getdata(records):
 #    pr = pd.read_csv(url)
     traffic_df = pd.read_csv(
         'D:/ML/Python/data/traffic/traffic236k_95_16.csv', header=0)
-#    pr = pd.read_csv('data/traffic72k_94_83.csv', header=0)
-    # pr = pd.read_csv('D:/dDocuments/ML/Python/data/Traffic/traffic116k_88_76pc.csv')
-#    pr = pd.read_sql(sqlcmd, conn)
+#   pr = pd.read_csv('data/traffic72k_94_83.csv', header=0)
+#   pr = pd.read_csv('D:/dDocuments/ML/Python/data/Traffic/traffic116k_88_76pc.csv')
+#   pr = pd.read_sql(sqlcmd, conn)
     sqlend = datetime.now()
-    processTime = sqlend - sqlstart
-    print('Seconds to download SQL records is: ', processTime.total_seconds())
+    process_time = sqlend - sqlstart
+    print('Seconds to download SQL records is: ', process_time.total_seconds())
     # pr.to_csv(r'..\data\traffic140k.csv', index=False)
     return traffic_df, sqlcmd, mysql, sqlparams
 
 
 def standardize(df):
-    """Standardize the data.
+    """Standardize the data.  Not being used.
 
     Parameters
     ----------
@@ -1172,11 +1228,14 @@ def standardize(df):
 
 
 def datapreparation():
-    """Do certain things to the data so it is ready for the model.
+    """Drop unneeded columns.  'Dummy up.'  Train,Test,split data.
+
+    So it is ready for to model.
 
     Returns
     -------
-    None.
+    xtrain, xtest, ytrain, ytest, categorical_variable_list,\
+        tstsummary, trn_data_df, target, class_names, bigcr, smlcr.
 
     """
     pr.drop(['Crash_year', 'monthday', 'speeddif', 'vMphGrp'], axis=1,
@@ -1187,67 +1246,35 @@ def datapreparation():
         pr.pop('vehicle_number')  # Return item and drop from frame
     if 'InvolvedVeh' in pr.columns:
         pr.pop('InvolvedVeh')  # Return item and drop from frame
-    # type(pr.index)
-    # pr
-    # type(pr)
-    # pr.shape     # Like the R dim command
-    # pr.describe()
-    # pr.iloc[:9]
-    # pr.head()
-    # pr.corr()
-    # nbrrecords = pr.shape[0]
-    # pr.describe(include=['object', 'category']).transpose()
-    # pr.describe(
-    #     include=['object', 'category']
-    # ).transpose().sort_values(by='unique', ascending=False)
-    # pr.plot(pr['wday'], pr['vehmph'], kind='scatter')
-
-    # list(pr.select_dtypes(np.object).columns)  # Get just the non-numerics...
 
     todummylist = list(pr.select_dtypes(np.object).columns)
 
     class_names = (['minor', 'major'])
-    # pr.shape
     pr.fillna(method='pad', inplace=True)
-    trn_data_df = pr  # .copy had strange results
+    trn_data_df = pr.copy()
     trn_data_df.info(memory_usage='deep')
 
-    j = pd.concat([pr['vehmph'], pr.crash], axis=1)
-    bigcr = j.vehmph[j.crash == 1]
-    smlcr = j.vehmph[j.crash == 0]
-
-    # j = pd.concat([pr.rdSurfac,pr.crash], axis=1)
-    # labels = f'Drivers Situation in {pr.shape[0]} crashes'
-    # bigcr = j.rdSurfac[j.crash==1]
-    # smlcr = j.rdSurfac[j.crash==0]
-    # if howfartoexecute != 'learningcurves':
-#    plot_histograms_stacked(bigcr, smlcr, 3,
-#                            'Actual accidents vs Road Surface',
-#                            labels)
-
-    if 'crash' in pr.columns:  # Allow me to run this frm multiple places in code
-        target = pr.pop('crash')  # Return item and drop from frame
+    if 'crash' in trn_data_df.columns:
+        target = trn_data_df.pop('crash')  # Return item and drop from frame
 
     # Function to dummy all the categorical variables used for modeling
     # courtesy of April Chen
 
-    def dummy_pr(pr, todummylist):
-        for x in todummylist:
-            dummies = pd.get_dummies(pr[x], prefix=x, dummy_na=False)
-            pr = pr.drop(x, 1)
-            pr = pd.concat([pr, dummies], axis=1)
-        return pr
-    # labels = f'{pr.shape[0]} crashes'
+    def dummy_pr(trn_data_df, todummylist):
+        for item in todummylist:
+            dummies = pd.get_dummies(trn_data_df[item], prefix=item, dummy_na=False)
+            trn_data_df = trn_data_df.drop(item, 1)
+            trn_data_df = pd.concat([trn_data_df, dummies], axis=1)
+        return trn_data_df
+    # below, expand trn_data_df to 88 cols, all numeric, now.
     trn_data_df = dummy_pr(trn_data_df, todummylist)
     trn_data_df.head()
     # ### Note WE ARE NOT STANDARDIZING...WHEN THE BELOW IS COMMENTED.!!!
     # trn_data_df = standardize(trn_data_df)
     trng_prct = .75
-    Xtrain, Xtest, ytrain, ytest =\
-        train_test_split(trn_data_df, target, test_size=1 - trng_prct, random_state=200)
-    # type(X_train)
-    # X_train.shape
-    # X_test.shape
+    xtrain, xtest, ytrain, ytest =\
+        train_test_split(trn_data_df, target, test_size=1 - trng_prct,
+                         random_state=200)
 
     txt0 = f'Given ~{pr.shape[0]} records, {trng_prct*100}% are used for training.'
     txt1 = f'  That leaves {len(ytest)} for testing (evaluating the model).'
@@ -1255,41 +1282,33 @@ def datapreparation():
     tstsummary = ('{}').format(txt0) + '\n' + ('{}').format(txt1) +\
         '\n' + ('{}').format(txt2)
 
-    categoricalVariableList = pr.describe(
+    categorical_variable_list = pr.describe(
         include=['object', 'category']
     ).transpose().sort_values(by='unique', ascending=False)
 
-    categoricalVariableList = categoricalVariableList.to_string(header=False)
+    categorical_variable_list = categorical_variable_list.to_string(header=False)
 
-    return Xtrain, Xtest, ytrain, ytest, pr, categoricalVariableList,\
-        tstsummary, trn_data_df, target, class_names, bigcr, smlcr
+    return xtrain, xtest, ytrain, ytest, categorical_variable_list,\
+        tstsummary, trn_data_df, target, class_names  # , bigcr, smlcr
 
 
 # %% MAIN Code--> Call to get & prep the data
-txtmdl, mdl, mdlsttime, filename, start = \
-    setstartingconditions()
+txtmdl, mdl, mdlsttime, filename, start = setstartingconditions()
 
-# howfartoexecute = 'ALLlearningcurves'
-howfartoexecute = 'learningcurves'
+pr, SQLCommand, SQL, SqlParameters = getdata(118000)  # return 2*118,000...
+# sys.exit()
+X_train, X_test, y_train, y_test, categoricalVariablesList,\
+    testsummary, X, y, class_names_gnb = datapreparation()
 
-pr, SQLCommand, SQL, SqlParameters = \
-    getdata(118000)  # return 2*118,000...
-
-X_train, X_test, y_train, y_test, pr, categoricalVariablesList,\
-    testsummary, X, y, class_names_gnb, major, minor = \
-    datapreparation()
-
-# if howfartoexecute == 'learningcurves':
-#     print('quit')
-#     sys.exit()
 # %%  5 Charts: data as it looks prior to modeling --> DRIVES FEATURE ENGINEERING
 FIGNBR = 0
-plot_histograms_stacked(major, minor, 100)
-plot4histograms()
 
-X_train.describe()
-y_train.head()
-X_test.describe()
+j = pd.concat([pr['vehmph'], pr.crash], axis=1)
+bigcr = j.vehmph[j.crash == 1]
+smlcr = j.vehmph[j.crash == 0]
+
+plot_histograms_stacked(bigcr, smlcr, 100)  # send in two series to plot.
+plot4histograms()
 
 # %% Define & Fit the model
 
@@ -1306,9 +1325,6 @@ def strmodel():
     # https://towardsdatascience.com/xgboost-theory-and-practice-fb8912930ad6
 
     """
-    target = 'crash'
-    predictors = [x for x in X_train.columns if x not in [target]]  # , IDcol]]
-    # predictors = y_train.columns
     mdlparams = {
         # besides fixing the error, this next line improved accuracy by 1% :)
         'use_label_encoder': False,
@@ -1346,13 +1362,11 @@ def strmodel():
                 eval_metric=["error", "logloss"],  # 06 Oct 2021 fixes warning
                 eval_set=eval_set, verbose=100)
     mdlend = datetime.now()
-    getdataTime = mdlend - mdlstart
-    print('Seconds to train model is: ', getdataTime.total_seconds())
+    getdata_time = mdlend - mdlstart
+    print('Seconds to train model is: ', getdata_time.total_seconds())
     mdl_predictions = xgb1mdl.predict(X_test)
-    # mdl_predictions = xgb1mdl.predict_proba(X_test)
     y_actuals = y_test
     print(confusion_matrix(y_actuals, mdl_predictions))
-    # accuracy_score(X_train, X_pred )
     mdlaccuracy = accuracy_score(y_test, mdl_predictions)
     # print(f'Accuracy: {mdlaccuracy} ')  # , or below, perhaps a nicer way...
     print('Accuracy: %.2f%%' % (mdlaccuracy * 100))
@@ -1362,15 +1376,15 @@ def strmodel():
     mdlresults = xgb1mdl.evals_result()
     mdlepochs = len(mdlresults['validation_0']['error'])
     xaxis = range(0, mdlepochs)
-    mdlTrainingSeconds = round(getdataTime.total_seconds(), 2)
-    if mdlTrainingSeconds > 60:
-        mdlTrainingSeconds = round(mdlTrainingSeconds / 60, 3)
-        modelTngTime = str(mdlTrainingSeconds) + ' Mins'
+    mdl_training_seconds = round(getdata_time.total_seconds(), 2)
+    if mdl_training_seconds > 60:
+        mdl_training_seconds = round(mdl_training_seconds / 60, 3)
+        model_tng_time = str(mdl_training_seconds) + ' Mins'
     else:
-        modelTngTime = str(mdlTrainingSeconds) + ' Sec'
+        model_tng_time = str(mdl_training_seconds) + ' Sec'
     con_mtrx = confusion_matrix(y_test, mdl_predictions)
     return xgb1mdl, mdl_predictions, y_actuals, mdlaccuracy, mdlparams, mdlresults, \
-        xaxis, mdlepochs, modelTngTime, con_mtrx
+        xaxis, mdlepochs, model_tng_time, con_mtrx
     # Note 'xgb1' is the resulting model!!!
 
 
@@ -1394,43 +1408,32 @@ md = xgb1.get_params()['max_depth']
 ne = xgb1.get_params()['n_estimators']
 bt = xgb1.get_booster().best_iteration
 # mdlparams = f'Learn:{lr}, depth: {md}, trees: {ne} '
-keyparams = str(f'Learn:{lr}   depth:   {md}\ntrees: {ne}  HiPoint: {bt} '
+KEYPARAMS = str(f'Learn:{lr}   depth:   {md}\ntrees: {ne}  HiPoint: {bt} '
                 f'\nModel tng time: {mdlTngTime}')
 
-
 # #######################  ROC CURVE ###############################
-mdl = XGBClassifier.mro()[0]
+Mdl = XGBClassifier.mro()[0]
 txtparams = json.dumps(params)
 txtparams = txtparams.replace(',', '\n')
 
 # %% 11 Charts: Model's validity, accuracy,calibr, confidenc, lrning curves (3)
-# Learning curve #1 & 2 (SIDE-BY-SIDE)
 plot_learningcurves_logloss_classerror()  # THIS IS THE BEST!
 
 # Following two options for optimum visibility of a tree:
 plot_tree(0, 'LR')
 xgb.to_graphviz(xgb1, rankdir='LR')  # this line goes to console...
 
-# sys.exit()
+roc_rcvr_operating_curve(xgb1)  # Fig 8
 
-ROC_rcvr_operating_curve(xgb1)  # Fig 8
-
-howfartoexecute = 'learningcurves'  # 'alltheway'
-# if howfartoexecute == 'learningcurves':
-#     print('quit')
-#     sys.exit()
-
-plot_ConfusionMatrixChart(xgb1)  # makes 2...2nd is by percentage
+plot_confusionmatrix_chart(xgb1)  # makes 2...2nd is by percentage
 
 print(f'Start Calibration:  {dt_string}  \nExpect this to take 5 minutes...')
 
 plot_calibration_curve(xgb1, "XGBoost")  # expect 4.5 min
 # sys.exit()
-plot_2confidenceHistograms()
+plot_2confidence_histograms()
 lcstart = datetime.now()
 print(f'histograms done in {lcstart-startcls}')
-
-
 
 # %% Scalability, performance curves (3 in 1 chart)
 # too long to run for PASS... so comment out.
@@ -1449,8 +1452,6 @@ because it will generate extra copies and increase memory consumption'''
 #############
 # %%  4 Charts: Model's explainability --> feature importance
 plot_tree(1, 'LR')
-
-#  following makes sklearn.utils.Bunch
 
 startcls = datetime.now()
 dt_string = startcls.strftime("%m/%d/%Y %H:%M:%S")
@@ -1473,8 +1474,8 @@ durationSeconds = permutationDuration.total_seconds()
 
 result, sorted_idx =\
     plot_permutationimportancechart(durationSeconds)  # Fig: 14?
-max_num_features = 25
-plot_feature_importance(max_num_features, 'weight')  # Fig: 15
+MAX_NUM_FEATURES = 25
+plot_feature_importance(MAX_NUM_FEATURES, 'weight')  # Fig: 15
 
 # There are 3 methods to measure importance in XGBoost:
 # Weight. The number of times a feature is used to split the data across all trees.
@@ -1482,11 +1483,11 @@ plot_feature_importance(max_num_features, 'weight')  # Fig: 15
 # weighted by the number of training data points that go through those splits.
 # Gain. The average training loss reduction gained when using a feature for splitting.
 
-plot_feature_importance(max_num_features, 'gain')  # could also be 'gain'
-plot_sidebyside_feature_importanceVSpermutation(max_num_features)  # Plot 17
+plot_feature_importance(MAX_NUM_FEATURES, 'gain')  # could also be 'gain'
+plot_sidebyside_feature_importance_vs_permutation(MAX_NUM_FEATURES)  # Plot 17
 # %% Shap charts coming...
 explainer = shap.TreeExplainer(xgb1)
-print('Need 16 minutes to do these shap calculations...')
+print('Need 10 minutes to do these shap calculations...')
 startShap = datetime.now()
 # notice, 1st for ALL records, 2nd just for training... (just saying)
 shap_values = explainer.shap_values(X)  # 19+ minutes!  @depth = 9
@@ -1496,32 +1497,23 @@ waterfall_values = explainer(X_train)  # ~8 minutes!
 durationShap = datetime.now() - startShap
 print('Shap_values calculated:'
       '  {} ... 3 waterfalls coming:'.format(durationShap))
-shap.plots.waterfall(waterfall_values[0])
-shap.plots.waterfall(waterfall_values[1])
-shap.plots.waterfall(waterfall_values[2])
+shapwaterfall(0)
+shapwaterfall(1)
+shapwaterfall(2)
 
-# https://medium.com/dataman-in-ai/the-shap-with-more-elegant-charts-bc3e73fa1c0c
-shap.plots.bar(waterfall_values.cohorts(2).abs.mean(0))
+heterogeneity()  # chart...neat!
 
 shap_v, shapvaluesdf, colorlist = ABS_SHAP(shap_values, X)
 print('ABS_Shap calculated:  {} ...'.format(
     datetime.now().strftime("%m/%d/%Y %H:%M:%S")))
-# shap_v = ABS_SHAP(shap_values,X)
 print('Printing 4 shap charts')
-plot_SHAP_charts(shapvaluesdf)  # <--THREE charts! ~30 sec for all 7
+plot_SHAP_charts()  # <--THREE charts! ~30 sec for all 7
 print('Printed 4 focused shap charts: {} ...'.format(
     datetime.now().strftime("%m/%d/%Y %H:%M:%S")))
 plot_SHAP_charts2()  # <--Five charts! ~30 sec for all 7
-# plt.rcdefaults()
 
 # %% We're done!
 plot_tree(xgb1.get_booster().best_iteration, 'LR')
 xgb1.get_booster().num_boosted_rounds()
 duration = datetime.now() - start
 print(f'Total duration for {filename} is: {duration}')
-# %% extra:
-# https://h1ros.github.io/posts/interpretability-of-prediction-for-boston-housing-using-shap/
-# this is creating: <shap.plots._force.AdditiveForceVisualizer at 0x21103d0f5b0>
-# and Nothing is going to the plot plane... perhaps run in Jupyter?
-# i = 0
-# shap.force_plot(explainer.expected_value, shap_values[i, :], X.iloc[i, :])
