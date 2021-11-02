@@ -89,10 +89,10 @@ meanX = pd.DataFrame(X.mean().to_dict(),index=[X.index.values[-1]])
 # Collects user input features into dataframe
 def user_input_features():
 #    sex = st.sidebar.selectbox('Sex',('male','female'))
-    speed = st.sidebar.slider('Speed', 0,99,31)
-    drvage = st.sidebar.slider('Driver Age', 12,99,44)
-    vehage = st.sidebar.slider('Veh Age', 1,23,7)
-    dayhour = st.sidebar.slider('Hour of Day', 0,23,7)
+    speed = st.sidebar.slider('Speed', 0,99,30)
+    drvage = st.sidebar.slider('Driver Age', 12,99,37)
+    vehage = st.sidebar.slider('Veh Age', 1,23,2)
+    dayhour = st.sidebar.slider('Hour of Day', 0,23,4)
     data = {
             'vehmph': speed,
             'drvage': drvage,
@@ -130,7 +130,7 @@ explainerxgb = shap.Explainer(xgb1)
 shap_values = explainerxgb(meanX)  # 19+ minutes!  @depth = 9
 
 fig1 = plt.figure(figsize=(8, 4))
-plt.title('Feature importance based on SHAP values (Bar)')
+plt.title('Top 10 Features impacting prediction (desc order)')
 shap.plots.waterfall(shap_values[0])
 #st.pyplot(bbox_inches='tight')
 st.pyplot(fig1)
