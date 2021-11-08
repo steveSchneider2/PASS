@@ -1012,38 +1012,6 @@ def plot_SHAP_charts2():
 #    return shap_values
 
 
-def heterogeneity():
-    """Graph shows heterogeneity.
-
-    Returns
-    -------
-    None.
-
-    """
-    # https://medium.com/dataman-in-ai/the-shap-with-more-elegant-charts-bc3e73fa1c0c
-    global FIGNBR
-    explanation = ('The threshold of this optimal division is speed=20 mph. The bar '
-                   '\nplot tells us that the reason to go to the cohort of speed>20'
-                   '\nis because of vehicle age (SHAP = 0.2), older driver '
-                   '(SHAP = 0.19)\nand urban location(no) (SHAP = 0.18), etc.')
-    shap.plots.bar(waterfall_values.cohorts(2).abs.mean(0), show=False)
-    fig = plt.gcf()  # gcf means "get current figure"
-    fig.set_figheight(8)
-    fig.set_figwidth(11)
-    fig.tight_layout()
-    # plt.rcParams['font.size'] = '12'
-    axs = plt.gca()  # gca means "get current axes"
-    trans = transforms.blended_transform_factory(axs.transAxes, axs.transAxes)
-    axs.legend(loc='center right')  # bbox_to_anchor=(0., 2.02, 1., .102))
-    FIGNBR += 1
-    plt.title(f'Fig {FIGNBR}: insights into the heterogeneity of accidents',
-              fontsize=24)
-    plt.text(.15, .75, horizontalalignment='left', transform=trans,
-             s=explanation, va='top',
-             fontsize=14, bbox=dict(facecolor='aqua', alpha=0.5))  #
-    plt.show()
-
-
 def shapwaterfall(item=1):
     """Chart how a particular decision is made.
 
@@ -1500,8 +1468,6 @@ print('Shap_values calculated:'
 shapwaterfall(0)
 shapwaterfall(1)
 shapwaterfall(2)
-
-heterogeneity()  # chart...neat!
 
 shap_v, shapvaluesdf, colorlist = ABS_SHAP(shap_values, X)
 print('ABS_Shap calculated:  {} ...'.format(
